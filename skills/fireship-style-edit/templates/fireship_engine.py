@@ -2,7 +2,7 @@
 """Fireship-style ("Code Report") faceless B-roll engine, 1920x1080.
 
 Reverse-engineered 2026-09-29 from Fireship's "Meta is pivoting again" (Code Report,
-5:40, study in clone-projects/fireship-style-study/). The narrator never appears: every
+5:40, study in clone-projects/fireship-style-study/ (historical, not bundled)). The narrator never appears: every
 second is B-roll (event footage, docs with orange highlighter, tweets, headline cards,
 cutouts, memes, sticker text, built-up diagrams), hard-cut roughly every 2.2 s with a
 new element landing every ~1-1.5 s, over a continuous music bed.
@@ -477,6 +477,26 @@ class DiagramItem:
     image: Image.Image | None = None
 
 
+def _fit_block_text(d: ImageDraw.ImageDraw, txt: str, max_w: float, max_h: float):
+    """Diagram block label that always fits its box: one line at the readable size (pixel 30),
+    else two balanced lines, and only then shrink (never below 16)."""
+    words = txt.split()
+    for size in range(30, 15, -2):
+        f = font("pixel", size)
+        if d.textlength(txt, font=f) <= max_w and size <= max_h:
+            return f, [txt]
+        if len(words) > 1 and (size * 2 + 10) <= max_h:
+            best = None
+            for k in range(1, len(words)):
+                l1, l2 = " ".join(words[:k]), " ".join(words[k:])
+                wmax = max(d.textlength(l1, font=f), d.textlength(l2, font=f))
+                if wmax <= max_w and (best is None or wmax < best[0]):
+                    best = (wmax, [l1, l2])
+            if best:
+                return f, best[1]
+    return font("pixel", 16), [txt]
+
+
 def draw_diagram(items: list[DiagramItem], lt: float, title: str = "") -> Image.Image:
     """Dark-ground systems diagram that BUILDS in sync with narration: purple outer frame with a
     tiny pixel caption, orange dashed sub-box, orange pixel labels, solid colored blocks
@@ -513,7 +533,10 @@ def draw_diagram(items: list[DiagramItem], lt: float, title: str = "") -> Image.
             cx, cy, w2, h2 = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * s, (y1 - y0) / 2 * s
             d.rounded_rectangle([cx - w2, cy - h2, cx + w2, cy + h2], 10, fill=it.color + (a,))
             txtc = INK if sum(it.color) > 380 else WHITE
-            d.text((cx, cy), it.text.upper(), font=fl, fill=txtc + (a,), anchor="mm")
+            fb, lines_ = _fit_block_text(d, it.text.upper(), (x1 - x0) - 36, (y1 - y0) - 20)
+            lh = fb.size + 10
+            for k, ln in enumerate(lines_):
+                d.text((cx, cy + (k - (len(lines_) - 1) / 2) * lh), ln, font=fb, fill=txtc + (a,), anchor="mm")
         elif it.kind in ("arrow", "red_arrow"):
             (x0, y0), (x1, y1) = it.box
             col = RED if it.kind == "red_arrow" else WHITE
