@@ -21,6 +21,7 @@ channels, where it edits real videos every day.
 | [`split-animated-short`](skills/split-animated-short/SKILL.md) | The 55/45 split format from a script or a source reel, for an AI avatar (HeyGen) instead of your own footage. |
 | [`fireship-style-edit`](skills/fireship-style-edit/SKILL.md) | Faceless "Code Report" style tech news over a voiceover: 2.2s cuts, footage that literally shows what each line says, tweet/headline stacks, highlighted docs, built-up diagrams, memes. |
 | [`fireship-style-short`](skills/fireship-style-short/SKILL.md) | The same Fireship grammar for Shorts / Reels / TikTok: 1080×1920, ~1.5s cuts, news footage as bands over a blurred fill, stickers in the safe slots, word-chunk captions. Shares the long-form engine. |
+| [`reverse-engineer`](skills/reverse-engineer/SKILL.md) | **Learn any editing style.** Point it at a reference video: it measures cuts, shot lengths, things landing per minute, motion, faces/layout, palette, loudness and words per minute, builds contact sheets of every shot for the agent to study, then scaffolds iteration 1 of a new `<style>-edit` skill (numbers, rules, base engine) and proves it with a demo render. |
 
 Each skill is a `SKILL.md` playbook (the rules, sizes, timings and every lesson learned the hard way)
 plus the Python that does the work:
