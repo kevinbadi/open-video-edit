@@ -19,7 +19,7 @@ channels, where it edits real videos every day.
 | [`split-animated-talking-head`](skills/split-animated-talking-head/SKILL.md) | **The flagship.** A 1080×1920 vertical short: your talking head in a rounded band at the bottom, a dense animated slot on top, Luckiest Guy captions resting on the accent line. |
 | [`longform-animated-talking-head`](skills/longform-animated-talking-head/SKILL.md) | The same hyper-edit for 16:9 YouTube long-form: split view (animation slot + head card), zoom dissolves, chapter beats. |
 | [`split-animated-short`](skills/split-animated-short/SKILL.md) | The 55/45 split format from a script or a source reel, for an AI avatar (HeyGen) instead of your own footage. |
-| [`fireship-style-edit`](skills/fireship-style-edit/SKILL.md) | Faceless "Code Report" style tech news: 2.2s cuts, captured web pages, memes, no presenter on screen. |
+| [`fireship-style-edit`](skills/fireship-style-edit/SKILL.md) | Faceless "Code Report" style tech news over a voiceover: 2.2s cuts, footage that literally shows what each line says, tweet/headline stacks, highlighted docs, built-up diagrams, memes. |
 
 Each skill is a `SKILL.md` playbook (the rules, sizes, timings and every lesson learned the hard way)
 plus the Python that does the work:
@@ -30,6 +30,7 @@ plus the Python that does the work:
   - `fetch_figure.py`: face-cropped portraits of the people behind a niche (Anthropic founders, OpenAI, Meta, GaryVee, Hormozi...).
   - `fetch_giphy.py`: Giphy search, downloaded as frame banks.
   - `number_beats.py`: finds every spoken number so it gets a counter.
+  - `fetch_footage.py` (fireship): yt-dlp search → download (auto-updates on a YouTube 403) → 1 fps contact sheet → frame-accurate cut, with `--crop` for news picture-in-picture panels.
 - **`templates/`**
   - `hyper_edits.py`: punch-ins, shake, whip cuts, 1–2 frame flash inserts, spring entrances, typewriter text, and a one-moving-stream-per-band lane guard.
   - `light_fx.py`: scanlines, HUD scan, neon floor grid, bloom, light hits, light rays and caption glow.
@@ -53,6 +54,7 @@ Real `render.py` files from shipped edits. These are the best way to learn the s
 | `name-is-jef` | A product explainer with founder portraits, pricing and chart shots, decision cards. |
 | `viktor-short` | Parallel chunked rendering, with the band kept in sync. |
 | `viktor-intro-longform` | A 16:9 long-form cut. |
+| `prompt-injection-fireship` | 60s Fireship-style cold open: 27 cuts, real event footage, a Wikipedia highlighter, an 8s diagram build, memes placed around their burned-in captions. |
 
 They reference their own `assets/` and `source/` folders, which are not included. Read them, copy the
 patterns, don't run them as-is.

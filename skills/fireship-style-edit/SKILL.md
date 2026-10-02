@@ -1,6 +1,6 @@
 ---
 name: fireship-style-edit
-description: Edit or build a FACELESS, Fireship "Code Report"-style tech news video (16:9, 1920x1080) — narrator never on screen, 100% B-roll (event footage, real article/doc screenshots with an orange highlighter sweep, tweet + headline card stacks, background-removed cutouts, meme cut-ins, slapped-on sticker text, built-up systems diagrams, glitch cuts) hard-cut every ~2 s over a continuous music bed at ~210 wpm deadpan narration. Use when Kevin asks for "Fireship style", a Code Report / news-roundup / "everything you missed" video, a faceless tech explainer, or a voiceover-driven B-roll edit. His own talking-head footage goes to longform-animated-talking-head / split-animated-talking-head instead.
+description: Edit or build a FACELESS, Fireship "Code Report"-style tech news video (16:9, 1920x1080) — narrator never on screen, 100% B-roll that LITERALLY shows what each line says (footage of the actual person/event via fetch_footage.py, real article/doc screenshots with an orange highlighter sweep, tweet cards with X mark + profile pictures, headline card stacks, background-removed cutouts, meme cut-ins, slapped-on sticker text, built-up systems diagrams, glitch cuts) hard-cut every ~2 s over a continuous music bed at ~210 wpm deadpan narration. Use when Kevin asks for "Fireship style", a Code Report / news-roundup / "everything you missed" video, a faceless tech explainer, or a voiceover-driven B-roll edit. His own talking-head footage goes to longform-animated-talking-head / split-animated-talking-head instead.
 ---
 
 # Fireship-style edit (faceless "Code Report" format)
@@ -13,8 +13,36 @@ per-shot contact sheets, dense in-shot frame sheets, audio measurements):
 "Code Report" in our videos. Our show title is our own (default "The Kev Report").
 
 Engine: `templates/fireship_engine.py`. Template + device demo: `templates/render_template.py`.
-Real-page capture with in-page highlighter: `scripts/capture_page.mjs`.
+Real event footage: `scripts/fetch_footage.py` (yt-dlp search → download → 1 s contact sheet → accurate cut).
+Real docs: `wikipedia_extract()` + `wiki_doc()` in the engine (REST API, no browser).
+`scripts/capture_page.mjs` needs Playwright: optional, never the default (Kevin 2026-10-02: no browser automation for assets).
 Demo of every device: `~/Downloads/Fireship Style Demo Reel.mp4` (built from `clone-projects/fireship-demo/` (historical, not bundled)).
+
+## 0. LITERAL VISUALS (Kevin 2026-10-02, first test edit review)
+
+> "the edit can be even more descriptive of what's being said ... in the intro it should LITERALLY be
+> the prime president of australia speaking."
+
+The picture shows **exactly what the sentence says**, as literally as footage allows:
+
+- **A person did something** → footage of THAT person doing it (the PM at the UN podium speaking,
+  Jensen on stage holding the chip). Find it with `fetch_footage.py --search "<person> <event>"`.
+  A flag, a city skyline or a logo is NOT a substitute for the person; it is at most an overlay.
+- **A company did something** → its product/event footage or its own page, plus the logo as an overlay.
+- **People reacted** → tweet cards (with platform mark + profile pictures, see below) or reaction memes.
+- **An abstract mechanism** → the built-up diagram.
+- A shot that is only a logo/sticker on black is the **last resort**, at most 1 in 8 shots.
+- Write the shot list as `time | exact VO words | what is literally on screen | source` and reject any
+  row where the screen doesn't depict the words.
+
+**Tweet cards always look real (Kevin 2026-10-02: "the social icon was missing as well as the profile
+picture of the tweeter").** `tweet_card()` now draws the X mark top-right, a profile picture and the
+reply/repost/like/views row. Profile pictures: a real public figure → their real photo
+(`split-animated-talking-head/scripts/fetch_figure.py` → `avatar="assets/figures/<slug>.png"`); a
+made-up handle → leave `avatar=None` for the generated gradient-initials avatar. Never put a random
+real stranger's face on an invented post, and never invent words for a real person: a card with a real
+person's name/photo must show a post they actually made (fetch the text, keep it verbatim). Jokes go on
+made-up handles.
 
 ## 1. The numbers (measured, hit these)
 
@@ -55,14 +83,14 @@ long and rolling. The VO carries all the information; visuals carry the jokes.
 |---|---|---|
 | Kinetic cold-open words on black | `kinetic_words()` | first 1–2 s, before the first image |
 | Article/doc bursts in with a fisheye | `Layer(anim="bulge")` | introduces a source |
-| **Orange highlighter read-along** | `doc_card(... phrase_spans())` or real page: `capture_page.mjs --highlight` → `highlight_image(img, boxes, p)` | quotes or paraphrases a doc: sweep p 0→1 across the spoken words |
-| Full-bleed footage + slow push | `video_bg()` / `image_bg()` | describes an event, product, person |
+| **Orange highlighter read-along** | real text: `wiki_doc(title, wikipedia_extract(title), highlight, p)` or `doc_card(wrap_text(text), phrase_spans(...))` | quotes or paraphrases a doc: sweep p 0→1 across the spoken words |
+| Full-bleed footage + slow push | `fetch_footage.py` → `video_bg(cut, 0)`; Commons photos → `image_bg()` | describes an event, product, person (**the literal person/event**, section 0) |
 | Logo slide-in + red block name | `Layer(img=logo, anim="slide_left")` + `sticker(name, "red_block")` | names a product the first time |
-| Tweet stack (tilted, overlapping) | `tweet_card()` ×2–3, tilts ±2–4° | "people online are saying…" |
+| Tweet stack (tilted, overlapping) | `tweet_card(name, handle, text, avatar=…, stats=…)` ×2–3, tilts ±2–4°: X mark + profile pic + icon row always | "people online are saying…" |
 | Headline card stack | `headline_card()` light + dark, stacked, offset | "reports say…", controversies |
 | Cutout walking over a card | `cutout()` (make with `npx hyperframes remove-background` or rembg) | a person reacts to / owns the thing on screen |
 | Reaction-face collage strip | `collage_strip()` | "everyone's reaction" |
-| Meme cut-in (full frame, 0.5–1.5 s) | Giphy via `split-animated-talking-head/scripts/fetch_giphy.py`, `bg=` frames | every punchline |
+| Meme cut-in (full frame, 0.5–1.5 s) | Giphy via `split-animated-talking-head/scripts/fetch_giphy.py`, `bg=` frames | every punchline; most GIFs have BURNED-IN captions ("HACKERMAN", "I confess!"): put stickers on the opposite edge, never over them |
 | Sticker text slapped on | `sticker(txt, style)`: `red_block` `starburst` `comic` `pink_plate` `price_box` `price_pop` `stamp` `name_plate` `quote` `year` `red_caps` | prices, names, years, one-word reactions ("BUT", "*GULP*", "FREE!") |
 | Hand-drawn curved pointer | `curved_arrow()` | points at the exact UI element or line being named |
 | Systems diagram that builds | `draw_diagram([DiagramItem...])`: purple frame + pixel caption, orange dashed box + labels, green/cyan/cream blocks, white arrows, **red arrows for the attack/fail path**, dropped-in icons | "the way it works is…" (one per video, 20–40 s) |
@@ -91,10 +119,17 @@ cp "<skill>/templates/render_template.py" render.py
 3. **Shot list**: walk the transcript, one Shot per ~2 s, one device per clause. Write it as a
    table (time | VO words | device | asset) before coding. Budget: ~1 meme per 15 s, 1 diagram, 3–6 doc
    highlights, 4–8 tweet/headline stacks, stickers everywhere.
-4. **Assets** (before choreography): real pages via
-   `node <skill>/scripts/capture_page.mjs --url … --selector … --highlight "exact phrase" --boxes x.json`
-   (capture a clean base AND a boxes file so the highlight SWEEPS on the words); logos; Giphy memes;
-   cutouts; event footage clips. Build a contact sheet and look at it.
+4. **Assets** (before choreography, literal-first, section 0):
+   - **Footage of the people/events named**:
+     `python3 <skill>/scripts/fetch_footage.py --search "<person> <event>"` → `--id <id> --slug x` →
+     `--slug x --sheet --from A --to B` (**1 frame per second**; a 5 s sheet picked the wrong moments in
+     the first test) → `--slug x --cut START DUR` → `video_bg("assets/footage/x_START.mp4", 0)`.
+     A YouTube 403 means a stale yt-dlp: the script runs `yt-dlp -U` and retries. Prefer uploads < 10 min.
+   - Free stills: Wikimedia Commons API (`generator=search&gsrnamespace=6`) → `image_bg()`.
+   - Docs: `wikipedia_extract("Prompt injection")` → `wiki_doc()`; other sites: fetch text with curl/APIs
+     and `doc_card(wrap_text(...))`. No Playwright unless Kevin asks.
+   - Logos (`fetch_brand_asset.py`), portraits for real tweeters (`fetch_figure.py`), Giphy memes, cutouts.
+   - Build a contact sheet of everything and LOOK before choreographing.
 5. **Author `render.py`**: `SHOTS = [Shot(t0, t1, bg=…, layers=[Layer(t0, t1, img=…, xy, tilt, anim)])]`
    with times from `at(WORDS, …)`.
 6. **Preview**: `PREVIEW="1.0,5.2,…" python3 render.py` → tile the frames and LOOK (dead frames,
@@ -107,9 +142,18 @@ cp "<skill>/templates/render_template.py" render.py
    ```
    Music bed: royalty-free/owned only (no trending or copyrighted tracks: YouTube Content ID).
 
-## 5. Don'ts
+## 5. Learnings
+- **2026-10-02 first full test (prompt-injection cold open, 60 s, 27 cuts):** Kevin: "pretty good". Fixes now in
+  the engine: tweet cards carry the X mark, profile pictures and the icon row; diagram labels are pixel 30
+  (18 was unreadable on a phone); headline cards 1200 wide; `mux()` outputs 48 kHz (loudnorm had made it 96 kHz).
+  Process fixes: literal visuals (section 0), 1 s contact sheets, stickers off burned-in GIF captions,
+  footage via yt-dlp. Reference: `examples/prompt-injection-fireship/render.py`.
+
+## 6. Don'ts
 - No face cam, no captions track, no bottom progress bar.
 - No static frame > 1.5 s, no shot > 3 s unless something is building.
 - No generic stock "AI brain" imagery: every visual is the actual thing being discussed.
+- No stand-ins for a named person (flag, skyline, logo) when footage of the person exists.
+- No tweet card without the platform mark and a profile picture.
 - No Fireship assets, music, logo, fonts-as-branding or the "Code Report" name.
 - Em/en dashes stay out of on-screen sticker text (house rule).

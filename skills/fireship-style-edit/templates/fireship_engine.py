@@ -255,49 +255,133 @@ def highlight_image(img: Image.Image, boxes: list[tuple[int, int, int, int]], p:
     return Image.fromarray(base.clip(0, 255).astype(np.uint8))
 
 
-def tweet_card(name: str, handle: str, text: str, avatar: Image.Image | None = None, verified: bool = True,
-               meta: str = "", width: int = 1150) -> Image.Image:
+AVATAR_COLORS = [((255, 122, 24), (230, 36, 52)), ((38, 190, 222), (126, 87, 214)), ((46, 204, 113), (38, 190, 222)),
+                 ((255, 214, 0), (255, 122, 24)), ((255, 150, 190), (126, 87, 214)), ((120, 130, 255), (38, 190, 222))]
+
+
+def auto_avatar(handle: str, size: int = 96) -> Image.Image:
+    """Profile picture for a made-up handle: deterministic two-tone gradient disc with initials.
+    Real people get a real photo instead (fetch_figure.py portrait -> tweet_card(avatar=path))."""
     def build():
-        f_name, f_h, f_t = font("ui", 38), font("ui", 32), font("ui", 42)
+        h = sum(ord(c) * (i + 1) for i, c in enumerate(handle))
+        c0, c1 = AVATAR_COLORS[h % len(AVATAR_COLORS)]
+        g = Image.new("RGBA", (size, size))
+        gd = ImageDraw.Draw(g)
+        for y in range(size):
+            t = y / max(1, size - 1)
+            gd.line([(0, y), (size, y)], fill=tuple(int(c0[k] + (c1[k] - c0[k]) * t) for k in range(3)) + (255,))
+        letters = "".join(w[0] for w in re.findall(r"[A-Za-z0-9]+", handle.lstrip("@"))[:2]).upper() or "?"
+        gd.text((size / 2, size / 2), letters[:2], font=font("ui", int(size * 0.42)), fill=WHITE, anchor="mm")
+        m = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(m).ellipse([0, 0, size - 1, size - 1], fill=255)
+        g.putalpha(m)
+        return g
+    return cached(("autoavatar", handle, size), build)
+
+
+def platform_mark(platform: str = "x", size: int = 44, col=WHITE) -> Image.Image | None:
+    """Platform logo for the card corner (templates/assets/<platform>-mark.png, alpha mask, tinted)."""
+    path = os.path.join(HERE, "assets", f"{platform}-mark.png")
+    if not os.path.exists(path):
+        return None
+    def build():
+        a = Image.open(path).convert("RGBA").split()[3]
+        s = size / max(a.size)
+        a = a.resize((max(1, int(a.width * s)), max(1, int(a.height * s))), Image.LANCZOS)
+        im = Image.new("RGBA", a.size, col + (255,))
+        im.putalpha(a)
+        return im
+    return cached(("pmark", platform, size, col), build)
+
+
+def _icon_row(d: ImageDraw.ImageDraw, x: int, y: int, stats: tuple, f, col) -> None:
+    """Reply / repost / like / views row drawn as simple glyph icons + counts."""
+    labels = list(stats) + [""] * (4 - len(stats))
+    for k, txt in enumerate(labels[:4]):
+        cx = x + k * 230
+        if k == 0:    # reply bubble
+            d.rounded_rectangle([cx, y + 2, cx + 30, y + 24], 10, outline=col, width=3)
+            d.polygon([(cx + 6, y + 22), (cx + 4, y + 32), (cx + 14, y + 23)], fill=col)
+        elif k == 1:  # repost arrows
+            d.line([(cx, y + 8), (cx + 24, y + 8), (cx + 24, y + 24)], fill=col, width=3)
+            d.polygon([(cx + 18, y + 20), (cx + 30, y + 20), (cx + 24, y + 30)], fill=col)
+            d.line([(cx + 32, y + 26), (cx + 8, y + 26), (cx + 8, y + 10)], fill=col, width=3)
+        elif k == 2:  # heart (parametric outline)
+            pts = []
+            for i in range(41):
+                a = i / 40 * 2 * math.pi
+                hx = 16 * math.sin(a) ** 3
+                hy = 13 * math.cos(a) - 5 * math.cos(2 * a) - 2 * math.cos(3 * a) - math.cos(4 * a)
+                pts.append((cx + 15 + hx * 0.95, y + 15 - hy * 0.95))
+            d.line(pts + [pts[0]], fill=col, width=3, joint="curve")
+        else:         # views bars
+            for b, hh in enumerate((10, 18, 26)):
+                d.rectangle([cx + b * 10, y + 30 - hh, cx + b * 10 + 5, y + 30], fill=col)
+        if txt:
+            d.text((cx + 44, y + 16), txt, font=f, fill=col, anchor="lm")
+
+
+def tweet_card(name: str, handle: str, text: str, avatar=None, verified: bool = True,
+               meta: str = "", width: int = 1300, platform: str = "x",
+               stats: tuple = ("1.2K", "4.8K", "38K", "2.1M")) -> Image.Image:
+    """X post card. Always carries the platform mark (top right) and a profile picture:
+    avatar = PIL image or file path (real person: fetch_figure.py portrait), or None for a
+    generated gradient-initials avatar (made-up handles: never borrow a real stranger's face).
+    stats = (replies, reposts, likes, views) for the icon row; () hides it."""
+    def build():
+        f_name, f_h, f_t, f_s = font("ui", 40), font("ui", 34), font("ui", 46), font("ui", 30)
         words, lines, cur = text.split(), [], ""
         dd = ImageDraw.Draw(Image.new("RGB", (1, 1)))
         for w in words:
             t = (cur + " " + w).strip()
-            if dd.textlength(t, font=f_t) > width - 80:
+            if dd.textlength(t, font=f_t) > width - 90:
                 lines.append(cur)
                 cur = w
             else:
                 cur = t
         lines.append(cur)
-        h = 140 + len(lines) * 56 + (60 if meta else 24)
+        h = 150 + len(lines) * 62 + (56 if meta else 10) + (70 if stats else 24)
         im = Image.new("RGBA", (width, h), TWEET_BG + (255,))
         d = ImageDraw.Draw(im)
-        d.rounded_rectangle([0, 0, width - 1, h - 1], 18, outline=(47, 51, 54, 255), width=2)
-        if avatar is not None:
-            av = avatar.convert("RGBA").resize((80, 80))
-            m = Image.new("L", (80, 80), 0)
-            ImageDraw.Draw(m).ellipse([0, 0, 79, 79], fill=255)
-            im.paste(av, (36, 30), m)
-        else:
-            d.ellipse([36, 30, 116, 110], fill=(60, 64, 70, 255))
-        d.text((136, 32), name, font=f_name, fill=WHITE)
-        nx = 136 + d.textlength(name, font=f_name) + 10
+        d.rounded_rectangle([0, 0, width - 1, h - 1], 22, outline=(47, 51, 54, 255), width=2)
+        av = avatar
+        if isinstance(av, str):
+            av = Image.open(av) if os.path.exists(av) else None
+        if av is None:
+            av = auto_avatar(handle, 96)
+        av = av.convert("RGBA").resize((96, 96), Image.LANCZOS)
+        m = Image.new("L", (96, 96), 0)
+        ImageDraw.Draw(m).ellipse([0, 0, 95, 95], fill=255)
+        a = Image.composite(av.split()[3], Image.new("L", (96, 96), 0), m)
+        av.putalpha(a)
+        im.alpha_composite(av, (36, 30))
+        d.text((150, 34), name, font=f_name, fill=WHITE)
+        nx = 150 + d.textlength(name, font=f_name) + 10
         if verified:
-            d.ellipse([nx, 40, nx + 32, 72], fill=(29, 155, 240, 255))
-            d.line([nx + 9, 56, nx + 15, 63, nx + 25, 49], fill=WHITE, width=4)
-        d.text((136, 78), handle, font=f_h, fill=TWEET_MUTED)
+            d.ellipse([nx, 42, nx + 34, 76], fill=(29, 155, 240, 255))
+            d.line([nx + 9, 59, nx + 15, 66, nx + 26, 51], fill=WHITE, width=4)
+        d.text((150, 82), handle, font=f_h, fill=TWEET_MUTED)
+        pm = platform_mark(platform, 46)
+        if pm is not None:
+            im.alpha_composite(pm, (width - pm.width - 40, 40))
         for i, ln in enumerate(lines):
-            d.text((36, 136 + i * 56), ln, font=f_t, fill=(231, 233, 234))
+            d.text((36, 146 + i * 62), ln, font=f_t, fill=(231, 233, 234))
+        y = 146 + len(lines) * 62 + 14
         if meta:
-            d.text((36, h - 54), meta, font=f_h, fill=TWEET_MUTED)
+            d.text((36, y), meta, font=f_h, fill=TWEET_MUTED)
+            y += 56
+        if stats:
+            d.line([(36, y), (width - 36, y)], fill=(47, 51, 54, 255), width=2)
+            _icon_row(d, 40, y + 16, stats, f_s, TWEET_MUTED)
         return im
-    return cached(("tweet", name, handle, text, id(avatar), verified, meta, width), build)
+    key_av = avatar if isinstance(avatar, str) else id(avatar)
+    return cached(("tweet", name, handle, text, key_av, verified, meta, width, platform, tuple(stats)), build)
 
 
-def headline_card(outlet: str, title: str, dek: str = "", width: int = 1000, dark: bool = False) -> Image.Image:
+def headline_card(outlet: str, title: str, dek: str = "", width: int = 1200, dark: bool = False) -> Image.Image:
     """News headline card (Wired/Verge/Reuters look): serif title, small caps outlet line."""
     def build():
-        f_o, f_t, f_d = font("mono", 20), font("serif", 52), font("ui", 26)
+        f_o, f_t, f_d = font("mono", 24), font("serif", 62), font("ui", 30)
         dd = ImageDraw.Draw(Image.new("RGB", (1, 1)))
         tl, cur = [], ""
         for w in title.split():
@@ -399,9 +483,9 @@ def draw_diagram(items: list[DiagramItem], lt: float, title: str = "") -> Image.
     (green / cyan / cream) with pixel text, white arrows, red arrows for the attack path."""
     im = Image.new("RGBA", (W, H), BLACK + (255,))
     d = ImageDraw.Draw(im)
-    fl = font("pixel", 18)
+    fl = font("pixel", 30)
     if title:
-        d.text((W // 2, 60), title.upper(), font=font("pixel", 16), fill=PURPLE, anchor="mm")
+        d.text((W // 2, 60), title.upper(), font=font("pixel", 26), fill=PURPLE, anchor="mm")
     for it in items:
         p = clamp01((lt - it.t) / 0.25)
         if p <= 0:
@@ -441,7 +525,16 @@ def draw_diagram(items: list[DiagramItem], lt: float, title: str = "") -> Image.
                 d.polygon([(ex, ey), (ex - 18 * math.cos(ang - 0.45), ey - 18 * math.sin(ang - 0.45)),
                            (ex - 18 * math.cos(ang + 0.45), ey - 18 * math.sin(ang + 0.45))], fill=col + (a,))
             if it.text:
-                d.text(((x0 + x1) / 2 + 12, (y0 + y1) / 2 - 10), it.text.upper(), font=font("pixel", 14), fill=col + (a,))
+                # label sits OFF the line (perpendicular offset) on a dark backing, never on the stroke
+                fl2 = font("pixel", 22)
+                L = math.hypot(x1 - x0, y1 - y0) or 1
+                nx, ny = -(y1 - y0) / L, (x1 - x0) / L
+                if ny > 0:
+                    nx, ny = -nx, -ny
+                mx, my = (x0 + x1) / 2 + nx * 38, (y0 + y1) / 2 + ny * 38
+                bb = d.textbbox((mx, my), it.text.upper(), font=fl2, anchor="mm")
+                d.rectangle([bb[0] - 10, bb[1] - 8, bb[2] + 10, bb[3] + 8], fill=BLACK + (a,))
+                d.text((mx, my), it.text.upper(), font=fl2, fill=col + (a,), anchor="mm")
         elif it.kind == "image" and it.image is not None:
             x, y = it.box[:2]
             s = 0.6 + 0.4 * ease_back(p)
@@ -682,7 +775,7 @@ def mux(out_dir: str, voice: str, music: str | None, out: str, fps: int = FPS, b
     else:
         amap = ["-map", "0:v", "-map", "1:a", "-af", "acompressor=threshold=-20dB:ratio=3,loudnorm=I=-14:LRA=4:TP=-1.5"]
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *inputs, *amap, "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                    "-crf", "18", "-preset", "medium", "-c:a", "aac", "-b:a", "192k", "-shortest",
+                    "-crf", "18", "-preset", "medium", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest",
                     "-movflags", "+faststart", out], check=True)
 
 
@@ -697,3 +790,46 @@ def at(words: list[tuple[str, float, float]], word: str, after: float = 0.0) -> 
         if a >= after and w.lower().strip(".,!?\"'") == wl:
             return a
     return after
+
+
+# ───────────────────────────── real docs without a browser ─────────────────────────────
+def wrap_text(text: str, width: int = 1400, size: int = 44, face: str = "ui") -> list[str]:
+    """Wrap plain text into doc_card lines that fit `width` (minus the card padding)."""
+    f = font(face, size)
+    dd = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    lines, cur = [], ""
+    for w in text.split():
+        t = (cur + " " + w).strip()
+        if dd.textlength(t, font=f) > width - 100:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = t
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def wikipedia_extract(title: str) -> str:
+    """Real article lead text via the Wikipedia REST API (no browser, no Playwright)."""
+    import urllib.parse
+    import urllib.request
+    url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title.replace(" ", "_"))
+    req = urllib.request.Request(url, headers={"User-Agent": "fireship-style-edit/1.0"})
+    return json.load(urllib.request.urlopen(req, timeout=20)).get("extract", "")
+
+
+def wiki_doc(title: str, text: str, highlight: str, p: float, width: int = 1500, size: int = 44,
+             max_lines: int = 7) -> Image.Image:
+    """Wikipedia-looking doc card (serif title + 'From Wikipedia' line) with the orange
+    highlighter sweeping `highlight` as p goes 0..1. `text` from wikipedia_extract()."""
+    lines = wrap_text(text, width, size)[:max_lines]
+    body = doc_card(lines, phrase_spans(lines, highlight), p=p, width=width, size=size)
+    head = 116
+    im = Image.new("RGBA", (body.width, body.height + head), WHITE + (255,))
+    d = ImageDraw.Draw(im)
+    d.text((44, 30), title, font=font("serif", 60), fill=INK)
+    d.text((body.width - 44, 56), "From Wikipedia, the free encyclopedia", font=font("ui", 26), fill=(110, 110, 116), anchor="ra")
+    d.line([44, head - 8, body.width - 44, head - 8], fill=(200, 200, 205), width=2)
+    im.paste(body, (0, head))
+    return im
