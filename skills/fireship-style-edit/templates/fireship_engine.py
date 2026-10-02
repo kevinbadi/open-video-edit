@@ -2,7 +2,7 @@
 """Fireship-style ("Code Report") faceless B-roll engine, 1920x1080.
 
 Reverse-engineered 2026-09-29 from Fireship's "Meta is pivoting again" (Code Report,
-5:40, study in clone-projects/fireship-style-study/ (historical, not bundled)). The narrator never appears: every
+5:40, study in clone-projects/fireship-style-study/). The narrator never appears: every
 second is B-roll (event footage, docs with orange highlighter, tweets, headline cards,
 cutouts, memes, sticker text, built-up diagrams), hard-cut roughly every 2.2 s with a
 new element landing every ~1-1.5 s, over a continuous music bed.
@@ -25,7 +25,10 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(HERE, "fonts")
-W, H = 1920, 1080
+# Canvas: 16:9 long-form by default; the fireship-style-short skill sets FIRESHIP_CANVAS=9:16
+# BEFORE importing this module (render scripts `from fireship_engine import *`, so it is fixed at import).
+W, H = (1080, 1920) if os.environ.get("FIRESHIP_CANVAS", "16:9") == "9:16" else (1920, 1080)
+VERTICAL = H > W
 FPS = 30
 
 # ───────────────────────────── palette (measured off the study frames) ─────────────────────────────
@@ -608,7 +611,8 @@ def bulge_pop(img: Image.Image, p: float) -> Image.Image:
     return Image.fromarray(out)
 
 
-def fit_cover(img: Image.Image, w: int = W, h: int = H, zoom: float = 1.0, fx: float = 0.5, fy: float = 0.5) -> Image.Image:
+def fit_cover(img: Image.Image, w: int | None = None, h: int | None = None, zoom: float = 1.0, fx: float = 0.5, fy: float = 0.5) -> Image.Image:
+    w, h = w or W, h or H
     s = max(w / img.width, h / img.height) * zoom
     r = img.resize((int(img.width * s) + 1, int(img.height * s) + 1), Image.BICUBIC)
     ox, oy = int((r.width - w) * fx), int((r.height - h) * fy)
@@ -685,9 +689,18 @@ def kinetic_words(words: list[tuple[str, float]], lt: float) -> Image.Image:
     shown = [w for w, t in words if lt >= t]
     if not shown:
         return im
+    d = ImageDraw.Draw(im)
+    if VERTICAL:   # stack the last 3 words, one per line, as big as the width allows
+        lines = [w.upper() for w in shown[-3:]]
+        size = 150
+        while size > 60 and max(d.textlength(l, font=font("display", size)) for l in lines) > W - 120:
+            size -= 6
+        f = font("display", size)
+        for i, l in enumerate(lines):
+            d.text((W // 2, H // 2 + (i - (len(lines) - 1) / 2) * size * 1.15), l, font=f, fill=WHITE, anchor="mm")
+        return im
     line = " ".join(shown[-3:]).upper()
     f = font("display", 110)
-    d = ImageDraw.Draw(im)
     d.text((W // 2, H // 2), line, font=f, fill=WHITE, anchor="mm")
     return im
 
@@ -756,7 +769,7 @@ def video_bg(path: str, src_start: float = 0.0, zoom: float = 1.0):
     return lambda lt, t: fit_cover(footage(path).frame(src_start + lt), zoom=zoom)
 
 
-def render(shots: list[Shot], duration: float, out_dir: str = "frames/out", fps: int = FPS) -> None:
+def render(shots: list[Shot], duration: float, out_dir: str = "frames/out", fps: int = FPS, post=None) -> None:
     """Render frames (RANGE="a:b" env for parallel chunks, PREVIEW="1.0,5.2" for spot checks)."""
     os.makedirs(out_dir, exist_ok=True)
     n = int(duration * fps)
@@ -775,6 +788,8 @@ def render(shots: list[Shot], duration: float, out_dir: str = "frames/out", fps:
         canvas = bg.convert("RGBA") if bg.size == (W, H) else fit_cover(bg.convert("RGBA"))
         for L in sh.layers:
             _place(canvas, L, lt)
+        if post is not None:      # e.g. the short-form caption layer: post(canvas_rgba, t)
+            post(canvas, t)
         frame = canvas.convert("RGB")
         if sh.glitch_in and lt < 2.5 / fps:
             frame = glitch(frame, int(lt * fps), seed=int(sh.t0 * 10))

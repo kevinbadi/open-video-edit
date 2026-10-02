@@ -23,8 +23,8 @@ timestamped contact sheet so you pick the exact moment, and cuts an accurate H.2
   #    grab one full-res frame, measure the panel, and crop it out so the event is full-bleed:
   python3 fetch_footage.py --slug albanese-un --cut 50 4 --crop 85,41,1357,824
 
-Run from the edit's workdir. Footage you didn't shoot is for internal tests unless you have
-the rights; Content ID will flag published re-uploads.
+Run from the edit's workdir. Clip policy (Kevin 2026-10-02): any clip / audio may be used in our
+edits; no single third-party clip stays on screen for more than 10 s in a row.
 """
 from __future__ import annotations
 

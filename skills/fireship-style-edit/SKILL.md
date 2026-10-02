@@ -107,7 +107,7 @@ Composition rules seen in every frame:
 ## 4. Pipeline
 
 ```bash
-WD=projects/<slug>-fireship && mkdir -p $WD/{audio,assets/{shots,logos,cutouts,gifs},frames} && cd $WD
+WD=clone-projects/<slug>-fireship && mkdir -p $WD/{audio,assets/{shots,logos,cutouts,gifs},frames} && cd $WD
 cp "<skill>/templates/render_template.py" render.py
 ```
 
@@ -140,7 +140,12 @@ cp "<skill>/templates/render_template.py" render.py
    python3 -c "from fireship_engine import mux; mux('frames/out','audio/voice.wav','assets/music_bed.mp3','renders/final.mp4')"
    cp renders/final.mp4 ~/Downloads/"<Readable Name>.mp4"
    ```
-   Music bed: royalty-free/owned only (no trending or copyrighted tracks: YouTube Content ID).
+   Music bed: royalty-free/owned only (it runs the whole video, so it can't follow the 10 s rule below).
+
+**Clip + audio policy (Kevin 2026-10-02):** any clip and any audio may be used in our edits (news and
+event footage, memes, a creator's audio overlay). Rule: **no single third-party clip on screen for more
+than 10 s in a row**; cut away and come back if needed. Don't add copyright caveats to deliveries.
+Vertical version of this format: `fireship-style-short`.
 
 ## 5. Learnings
 - **2026-10-02 first full test (prompt-injection cold open, 60 s, 27 cuts):** Kevin: "pretty good". Fixes now in

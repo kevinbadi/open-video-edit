@@ -20,6 +20,7 @@ channels, where it edits real videos every day.
 | [`longform-animated-talking-head`](skills/longform-animated-talking-head/SKILL.md) | The same hyper-edit for 16:9 YouTube long-form: split view (animation slot + head card), zoom dissolves, chapter beats. |
 | [`split-animated-short`](skills/split-animated-short/SKILL.md) | The 55/45 split format from a script or a source reel, for an AI avatar (HeyGen) instead of your own footage. |
 | [`fireship-style-edit`](skills/fireship-style-edit/SKILL.md) | Faceless "Code Report" style tech news over a voiceover: 2.2s cuts, footage that literally shows what each line says, tweet/headline stacks, highlighted docs, built-up diagrams, memes. |
+| [`fireship-style-short`](skills/fireship-style-short/SKILL.md) | The same Fireship grammar for Shorts / Reels / TikTok: 1080×1920, ~1.5s cuts, news footage as bands over a blurred fill, stickers in the safe slots, word-chunk captions. Shares the long-form engine. |
 
 Each skill is a `SKILL.md` playbook (the rules, sizes, timings and every lesson learned the hard way)
 plus the Python that does the work:
@@ -55,6 +56,8 @@ Real `render.py` files from shipped edits. These are the best way to learn the s
 | `viktor-short` | Parallel chunked rendering, with the band kept in sync. |
 | `viktor-intro-longform` | A 16:9 long-form cut. |
 | `prompt-injection-fireship` | 60s Fireship-style cold open: 27 cuts, real event footage, a Wikipedia highlighter, an 8s diagram build, memes placed around their burned-in captions. |
+| `weird-hack-fireship` | 60s long-form cut built from real BBC / CNBC / Bloomberg coverage: literal visuals on every line, two attack-chain diagrams. |
+| `weird-hack-short` | The same story as a 60s vertical short through `fireship-style-short`. |
 
 They reference their own `assets/` and `source/` folders, which are not included. Read them, copy the
 patterns, don't run them as-is.
